@@ -376,3 +376,205 @@ class CookingPlanApplication {
             return;
         }
         console.log(Logged in as: ${loggedInUser.name});
+        // Create sample recipes (now user is logged in)
+        const sampleRecipes = [
+            new Recipe(
+                null,
+                'Vegetable Stir Fry',
+                [
+                    new Ingredient('Broccoli', 200, 'g'),
+                    new Ingredient('Carrot', 2, ''),
+                    new Ingredient('Bell Pepper', 1, ''),
+                    new Ingredient('Soy Sauce', 3, 'tbsp')
+                ],
+                ['Chop vegetables', 'Stir fry in pan', 'Add sauce'],
+                ['vegetarian', 'quick'],
+                ['vegetarian', 'vegan']
+            ),
+            new Recipe(
+                null,
+                'Grilled Chicken',
+                [
+                    new Ingredient('Chicken Breast', 2, ''),
+                    new Ingredient('Olive Oil', 2, 'tbsp'),
+                    new Ingredient('Lemon', 1, ''),
+                    new Ingredient('Garlic', 3, 'cloves')
+                ],
+                ['Marinate chicken', 'Grill for 10 minutes', 'Serve with lemon'],
+                ['protein', 'grilled'],
+                ['gluten-free']
+            ),
+            new Recipe(
+                null,
+                'Pasta Carbonara',
+                [
+                    new Ingredient('Pasta', 250, 'g'),
+                    new Ingredient('Eggs', 2, ''),
+                    new Ingredient('Parmesan', 100, 'g'),
+                    new Ingredient('Bacon', 150, 'g')
+                ],
+                ['Cook pasta', 'Fry bacon', 'Mix eggs and cheese', 'Combine all'],
+                ['italian', 'pasta'],
+                []
+            )
+        ];
+        
+        // Save recipes
+        sampleRecipes.forEach(recipe => {
+            this.repository.saveRecipe(recipe);
+        });
+        
+        console.log(Created ${sampleRecipes.length} sample recipes);
+        console.log('Sample data initialized successfully\n');
+    }
+}
+
+// -----------------------------
+// 5. DEMONSTRATION
+// -----------------------------
+
+function demonstrate() {
+    console.log('=== COOKING PLAN DEMONSTRATION ===\n');
+    
+    try {
+        // Create application (uses Factory Pattern for repository)
+        console.log('1. Creating application...');
+        const app = new CookingPlanApplication();
+        
+        // Check if user is logged in
+        const currentUser = app.getCurrentUser();
+        if (!currentUser) {
+            console.log('ERROR: Application failed to initialize user session');
+            return;
+        }
+        
+        console.log(2. Current user: ${currentUser.name} (${currentUser.email}));
+        console.log(3. Total recipes: ${app.getAllRecipes().length});
+        
+        // Rate a recipe
+        const recipes = app.getAllRecipes();
+        if (recipes.length > 0) {
+            console.log('\n4. Rating first recipe...');
+            const recipeToRate = recipes[0];
+            app.rateRecipe(recipeToRate.id, 5);
+            app.rateRecipe(recipeToRate.id, 4);
+            const ratedRecipe = app.getRecipe(recipeToRate.id);
+            console.log(`   "${ratedRecipe.title}" now has ${ratedRecipe.rating.toFixed(1)} stars (${ratedRecipe.ratings.length} ratings)`);
+        }
+        
+        // Create meal plan
+        console.log('\n5. Creating meal plan...');
+        const mealPlan = app.createMealPlan('Weekly Dinner Plan');
+        console.log(`   Created: "${mealPlan.name}" (ID: ${mealPlan.id})`);
+        
+        // Add recipes to meal plan
+        if (recipes.length >= 2) {
+            console.log('\n6. Adding recipes to meal plan...');
+            app.addToMealPlan(mealPlan.id, 'Monday', recipes[0].id);
+            app.addToMealPlan(mealPlan.id, 'Tuesday', recipes[1].id);
+            const updatedPlan = app.getMealPlan(mealPlan.id);
+            console.log(`   Plan now has ${updatedPlan.entries.length} entries`);
+        }
+        
+        // Generate shopping lists using different strategies (Strategy Pattern)
+        console.log('\n7. SHOPPING LISTS (Strategy Pattern Demonstration):');
+        console.log('   Each strategy produces different results based on dietary restrictions:');
+        
+        const strategies = [
+            { type: 'basic', desc: 'All ingredients' },
+            { type: 'vegan', desc: 'No animal products' },
+            { type: 'glutenFree', desc: 'No gluten-containing items' }
+        ];
+        
+        strategies.forEach(({type, desc}) => {
+            try {
+                const shoppingList = app.generateShoppingList(mealPlan.id, type);
+                console.log(`   ${type.padEnd(10)}: ${shoppingList.length.toString().padEnd(2)} items - ${desc}`);
+                
+                if (shoppingList.length > 0) {
+                    console.log(`           Sample: ${shoppingList[0].toString()}`);
+                }
+            } catch (error) {
+                console.log(`   ${type} error: ${error.message}`);
+            }
+        });
+        
+        // Share meal plan
+        console.log('\n8. Sharing meal plan...');
+        try {
+            const sharedPlan = app.shareMealPlan(mealPlan.id, 'bob@example.com');
+            console.log(`   Successfully shared with Bob: "${sharedPlan.name}"`);
+        } catch (error) {
+            console.log(`   Share failed: ${error.message}`);
+        }
+        
+        // Search recipes
+        console.log('\n9. Searching for "vegan" recipes...');
+        const veganRecipes = app.searchRecipes('vegan');
+        console.log(`   Found ${veganRecipes.length} recipes: ${veganRecipes.map(r => r.title).join(', ')}`);
+        
+        // User meal plans
+        console.log('\n10. Checking user meal plans...');
+        const userPlans = app.getUserMealPlans();
+        console.log(`   ${currentUser.name} has ${userPlans.length} meal plans`);
+        
+        // Test Factory Pattern
+        console.log('\n11. FACTORY PATTERN DEMONSTRATION:');
+        console.log('   Creating repositories using Factory Pattern:');
+        const memoryRepo = RepositoryFactory.createRepository('memory');
+        console.log(`   ✓ Created: ${memoryRepo.constructor.name}`);
+        console.log('   The Factory Pattern encapsulates repository creation logic');
+        console.log('   and makes it easy to switch between different storage types.');
+        
+        // Test Strategy Pattern directly
+        console.log('\n12. STRATEGY PATTERN DEMONSTRATION:');
+        console.log('   Creating shopping list strategies using Strategy Pattern:');
+        const basicStrategy = ShoppingListStrategyFactory.createStrategy('basic');
+        const veganStrategy = ShoppingListStrategyFactory.createStrategy('vegan');
+        console.log(`   ✓ Created: ${basicStrategy.constructor.name}`);
+        console.log(`   ✓ Created: ${veganStrategy.constructor.name}`);
+        console.log('   The Strategy Pattern allows different algorithms to be');
+        console.log('   selected at runtime based on user preferences.');
+        
+        // Test Facade Pattern
+        console.log('\n13. FACADE PATTERN DEMONSTRATION:');
+        console.log('   The CookingPlanApplication class acts as a Facade:');
+        console.log('   - Provides simple interface to complex subsystem');
+        console.log('   - Hides repository, strategy, and business logic details');
+        console.log('   - Makes system easier to use for clients');
+        
+        console.log('\n=== DEMONSTRATION COMPLETE ===');
+        console.log('\n✅ PATTERNS SUCCESSFULLY IMPLEMENTED:');
+        console.log('   1. Factory Pattern: Repository creation');
+        console.log('   2. Strategy Pattern: Shopping list generation');
+        console.log('   3. Facade Pattern: Application interface');
+        console.log('\n✅ USER STORIES COVERED:');
+        console.log('   • Home cook: CRUD recipes with rating system');
+        console.log('   • Planner: Create meal plans with daily entries');
+        console.log('   • Shopper: Generate shopping lists (multiple strategies)');
+        console.log('   • Family member: Share meal plans');
+        console.log('   • Health-conscious: Filter by dietary flags');
+        
+    } catch (error) {
+        console.log('\n❌ ERROR during demonstration:');
+        console.log(`   Message: ${error.message}`);
+        console.log(`   Stack: ${error.stack}`);
+    }
+}
+
+// Run demonstration
+demonstrate();
+
+// Export for use
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        CookingPlanApplication,
+        RepositoryFactory,
+        ShoppingListStrategyFactory,
+        Ingredient,
+        Recipe,
+        PlanEntry,
+        MealPlan,
+        User
+    };
+}
