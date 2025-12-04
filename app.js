@@ -1,12 +1,20 @@
+// ================================================
+// COOKING PLAN - SIMPLIFIED BACKEND (FINAL FIX)
+// ================================================
+
+// -----------------------------
+// 1. DOMAIN CLASSES
+// -----------------------------
+
 class Ingredient {
-    constructor(name, amount, unit = ('')) {
+    constructor(name, amount, unit = '') {
         this.name = name;
         this.amount = amount;
         this.unit = unit;
-
     }
+
     toString() {
-        return '${this.amount} ${this.unit} ${this.name}' .trim();
+        return `${this.amount} ${this.unit} ${this.name}`.trim();
     }
 }
 
@@ -21,10 +29,11 @@ class Recipe {
         this.rating = 0;
         this.ratings = [];
     }
+
     rate(rating) {
         if (rating >= 1 && rating <= 5) {
             this.ratings.push(rating);
-            this.rating = this.rating.reduce((a, b) => a + b, 0) / this.ratings.length;
+            this.rating = this.ratings.reduce((a, b) => a + b, 0) / this.ratings.length;
             return true;
         }
         return false;
@@ -64,13 +73,17 @@ class User {
     }
 }
 
+// -----------------------------
+// 2. FACTORY PATTERN: Repository Factory
+// -----------------------------
+
 class RepositoryFactory {
     static createRepository(type) {
         switch(type) {
             case 'memory':
                 return new MemoryRepository();
             default:
-                throw new Error('Unkown repository type ${type}');
+                throw new Error(`Unknown repository type: ${type}`);
         }
     }
 }
@@ -83,17 +96,19 @@ class MemoryRepository {
         this.currentUserId = null;
     }
 
+    // Recipe methods
     saveRecipe(recipe) {
         if (!recipe.id) {
-            recipe.id = 'recipe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}';
+            recipe.id = `recipe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         }
-        this.recipes.set(recipe.id, recipe)
+        this.recipes.set(recipe.id, recipe);
         return recipe.id;
     }
 
     getRecipe(id) {
         return this.recipes.get(id);
     }
+
     getAllRecipes() {
         return Array.from(this.recipes.values());
     }
@@ -102,45 +117,53 @@ class MemoryRepository {
         return this.recipes.delete(id);
     }
 
-    saveMealPlan(mealPlan){
+    // Meal Plan methods
+    saveMealPlan(mealPlan) {
         if (!mealPlan.id) {
-            mealPlan.id = 'plan-${Date.now()}-${Math.random().toString(36).substr(2, 9)}';
+            mealPlan.id = `plan-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         }
         this.mealPlans.set(mealPlan.id, mealPlan);
         return mealPlan.id;
     }
-getMealPlan(id) {
-    return this.mealPlans.get(id);
-}
 
-getUserMealPlans(userId) {
-    return Array.from(this.mealPlans.values()).filter(plan => plan.userId === userId);
-}
-
-saveUser(user) {
-    if(!user.id) {
-        user.id = 'user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}';
+    getMealPlan(id) {
+        return this.mealPlans.get(id);
     }
-    this.users.set(user.id, user);
-    return user.id;
+
+    getUserMealPlans(userId) {
+        return Array.from(this.mealPlans.values()).filter(plan => plan.userId === userId);
+    }
+
+    // User methods
+    saveUser(user) {
+        if (!user.id) {
+            user.id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        }
+        this.users.set(user.id, user);
+        return user.id;
+    }
+
+    getUser(id) {
+        return this.users.get(id);
+    }
+
+    getUserByEmail(email) {
+        return Array.from(this.users.values()).find(user => user.email === email);
+    }
+
+    // Current user management
+    setCurrentUser(user) {
+        this.currentUserId = user ? user.id : null;
+    }
+
+    getCurrentUser() {
+        return this.currentUserId ? this.getUser(this.currentUserId) : null;
+    }
 }
 
-getUser(id) {
-    return this.users.get(id);
-}
-
-getUserByEmail(email) {
-    return Array.from(this.users.values()).find(user => user.email === email);
-}
-
-setCurrentUser(user) {
-    this.currentUserId = user ? user.id : null;
-}
-
-getCurrentUser() {
-    return this.currentUserId ? this.getUser(this.currentUserId) : null;
-}
-}
+// -----------------------------
+// 3. STRATEGY PATTERN: Shopping List Strategies
+// -----------------------------
 
 class ShoppingListStrategy {
     generate(mealPlan, recipeRepo) {
@@ -152,13 +175,13 @@ class BasicShoppingListStrategy extends ShoppingListStrategy {
     generate(mealPlan, recipeRepo) {
         const recipeIds = mealPlan.getRecipeIds();
         const ingredientsMap = new Map();
-
-        recipeIds.forEach(recipeId =>{
+        
+        recipeIds.forEach(recipeId => {
             const recipe = recipeRepo.getRecipe(recipeId);
             if (recipe && recipe.ingredients) {
                 recipe.ingredients.forEach(ing => {
-                    const key = '${ing.name}-${ing.unit}';
-                    if(ingredientsMap.has(key)) {
+                    const key = `${ing.name}-${ing.unit}`;
+                    if (ingredientsMap.has(key)) {
                         const existing = ingredientsMap.get(key);
                         existing.amount += ing.amount;
                     } else {
@@ -171,10 +194,9 @@ class BasicShoppingListStrategy extends ShoppingListStrategy {
                 });
             }
         });
-
-        return Array.from(ingredientsMap.values()).map(item =>
+        
+        return Array.from(ingredientsMap.values()).map(item => 
             new Ingredient(item.name, item.amount, item.unit)
-
         );
     }
 }
@@ -183,9 +205,9 @@ class VeganShoppingListStrategy extends ShoppingListStrategy {
     generate(mealPlan, recipeRepo) {
         const basicStrategy = new BasicShoppingListStrategy();
         const allIngredients = basicStrategy.generate(mealPlan, recipeRepo);
-
+        
         const nonVegan = ['meat', 'chicken', 'beef', 'pork', 'fish', 'egg', 'milk', 'cheese', 'butter', 'honey'];
-
+        
         return allIngredients.filter(ingredient =>
             !nonVegan.some(item => ingredient.name.toLowerCase().includes(item))
         );
@@ -205,6 +227,7 @@ class GlutenFreeShoppingListStrategy extends ShoppingListStrategy {
     }
 }
 
+// Strategy Factory
 class ShoppingListStrategyFactory {
     static createStrategy(type) {
         switch(type) {
@@ -219,6 +242,7 @@ class ShoppingListStrategyFactory {
         }
     }
 }
+
 // -----------------------------
 // 4. FACADE PATTERN: Cooking Plan Application
 // -----------------------------
@@ -351,7 +375,7 @@ class CookingPlanApplication {
         const sharedPlan = new MealPlan(
             null,
             targetUser.id,
-            ${mealPlan.name} (Shared by ${this.getCurrentUser().name}),
+            `${mealPlan.name} (Shared by ${this.getCurrentUser().name})`,
             [...mealPlan.entries]
         );
         
@@ -367,7 +391,7 @@ class CookingPlanApplication {
         const alice = this.register('Alice', 'alice@example.com');
         const bob = this.register('Bob', 'bob@example.com');
         
-        console.log(Created users: ${alice.name}, ${bob.name});
+        console.log(`Created users: ${alice.name}, ${bob.name}`);
         
         // Login as Alice
         const loggedInUser = this.login('alice@example.com');
@@ -375,7 +399,8 @@ class CookingPlanApplication {
             console.log('ERROR: Failed to login after registration');
             return;
         }
-        console.log(Logged in as: ${loggedInUser.name});
+        console.log(`Logged in as: ${loggedInUser.name}`);
+        
         // Create sample recipes (now user is logged in)
         const sampleRecipes = [
             new Recipe(
@@ -424,7 +449,7 @@ class CookingPlanApplication {
             this.repository.saveRecipe(recipe);
         });
         
-        console.log(Created ${sampleRecipes.length} sample recipes);
+        console.log(`Created ${sampleRecipes.length} sample recipes`);
         console.log('Sample data initialized successfully\n');
     }
 }
@@ -448,8 +473,8 @@ function demonstrate() {
             return;
         }
         
-        console.log(2. Current user: ${currentUser.name} (${currentUser.email}));
-        console.log(3. Total recipes: ${app.getAllRecipes().length});
+        console.log(`2. Current user: ${currentUser.name} (${currentUser.email})`);
+        console.log(`3. Total recipes: ${app.getAllRecipes().length}`);
         
         // Rate a recipe
         const recipes = app.getAllRecipes();
