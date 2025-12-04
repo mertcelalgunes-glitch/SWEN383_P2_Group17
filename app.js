@@ -142,3 +142,80 @@ getCurrentUser() {
 }
 }
 
+class ShoppingListStrategy {
+    generate(mealPlan, recipeRepo) {
+        throw new Error('generate method must be implemented');
+    }
+}
+
+class BasicShoppingListStrategy extends ShoppingListStrategy {
+    generate(mealPlan, recipeRepo) {
+        const recipeIds = mealPlan.getRecipeIds();
+        const ingredientsMap = new Map();
+
+        recipeIds.forEach(recipeId =>{
+            const recipe = recipeRepo.getRecipe(recipeId);
+            if (recipe && recipe.ingredients) {
+                recipe.ingredients.forEach(ing => {
+                    const key = '${ing.name}-${ing.unit}';
+                    if(ingredientsMap.has(key)) {
+                        const existing = ingredientsMap.get(key);
+                        existing.amount += ing.amount;
+                    } else {
+                        ingredientsMap.set(key, {
+                            name: ing.name,
+                            amount: ing.amount,
+                            unit: ing.unit
+                        });
+                    }
+                });
+            }
+        });
+
+        return Array.from(ingredientsMap.values()).map(item =>
+            new Ingredient(item.name, item.amount, item.unit)
+
+        );
+    }
+}
+
+class VeganShoppingListStrategy extends ShoppingListStrategy {
+    generate(mealPlan, recipeRepo) {
+        const basicStrategy = new BasicShoppingListStrategy();
+        const allIngredients = basicStrategy.generate(mealPlan, recipeRepo);
+
+        const nonVegan = ['meat', 'chicken', 'beef', 'pork', 'fish', 'egg', 'milk', 'cheese', 'butter', 'honey'];
+
+        return allIngredients.filter(ingredient =>
+            !nonVegan.some(item => ingredient.name.toLowerCase().includes(item))
+        );
+    }
+}
+
+class GlutenFreeShoppingListStrategy extends ShoppingListStrategy {
+    generate(mealPlan, recipeRepo) {
+        const basicStrategy = new BasicShoppingListStrategy();
+        const allIngredients = basicStrategy.generate(mealPlan, recipeRepo);
+        
+        const gluten = ['wheat', 'flour', 'bread', 'pasta', 'barley', 'rye'];
+        
+        return allIngredients.filter(ingredient =>
+            !gluten.some(item => ingredient.name.toLowerCase().includes(item))
+        );
+    }
+}
+
+class ShoppingListStrategyFactory {
+    static createStrategy(type) {
+        switch(type) {
+            case 'basic':
+                return new BasicShoppingListStrategy();
+            case 'vegan':
+                return new VeganShoppingListStrategy();
+            case 'glutenFree':
+                return new GlutenFreeShoppingListStrategy();
+            default:
+                return new BasicShoppingListStrategy();
+        }
+    }
+}
