@@ -219,3 +219,160 @@ class ShoppingListStrategyFactory {
         }
     }
 }
+// -----------------------------
+// 4. FACADE PATTERN: Cooking Plan Application
+// -----------------------------
+
+class CookingPlanApplication {
+    constructor() {
+        // Use Factory Pattern to create repository
+        this.repository = RepositoryFactory.createRepository('memory');
+        
+        // Initialize with sample data
+        this.initializeSampleData();
+    }
+    
+    // User Management
+    register(name, email) {
+        const user = new User(null, name, email);
+        const userId = this.repository.saveUser(user);
+        return this.repository.getUser(userId);
+    }
+    
+    login(email) {
+        const user = this.repository.getUserByEmail(email);
+        if (user) {
+            this.repository.setCurrentUser(user);
+            return user;
+        }
+        return null;
+    }
+    
+    logout() {
+        this.repository.setCurrentUser(null);
+    }
+    
+    getCurrentUser() {
+        return this.repository.getCurrentUser();
+    }
+    
+    isLoggedIn() {
+        return this.getCurrentUser() !== null;
+    }
+    
+    // Recipe Management
+    createRecipe(title, ingredients, steps, tags = [], dietaryFlags = []) {
+        if (!this.isLoggedIn()) throw new Error('Must be logged in');
+        
+        const recipe = new Recipe(null, title, ingredients, steps, tags, dietaryFlags);
+        this.repository.saveRecipe(recipe);
+        return recipe;
+    }
+    
+    getRecipe(id) {
+        return this.repository.getRecipe(id);
+    }
+    
+    getAllRecipes() {
+        return this.repository.getAllRecipes();
+    }
+    
+    rateRecipe(recipeId, rating) {
+        const recipe = this.repository.getRecipe(recipeId);
+        if (!recipe) throw new Error('Recipe not found');
+        
+        const success = recipe.rate(rating);
+        if (success) {
+            this.repository.saveRecipe(recipe);
+        }
+        return success;
+    }
+    
+    searchRecipes(query) {
+        const allRecipes = this.repository.getAllRecipes();
+        const lowerQuery = query.toLowerCase();
+        
+        return allRecipes.filter(recipe =>
+            recipe.title.toLowerCase().includes(lowerQuery) ||
+            (recipe.tags && recipe.tags.some(tag => tag.toLowerCase().includes(lowerQuery))) ||
+            (recipe.dietaryFlags && recipe.dietaryFlags.some(flag => flag.toLowerCase().includes(lowerQuery)))
+        );
+    }
+    
+    // Meal Plan Management
+    createMealPlan(name) {
+        if (!this.isLoggedIn()) throw new Error('Must be logged in');
+        
+        const mealPlan = new MealPlan(null, this.getCurrentUser().id, name);
+        this.repository.saveMealPlan(mealPlan);
+        return mealPlan;
+    }
+    
+    addToMealPlan(mealPlanId, day, recipeId) {
+        const mealPlan = this.repository.getMealPlan(mealPlanId);
+        if (!mealPlan) throw new Error('Meal plan not found');
+        if (mealPlan.userId !== this.getCurrentUser().id) throw new Error('Not your meal plan');
+        
+        const entry = new PlanEntry(day, recipeId);
+        mealPlan.addEntry(entry);
+        this.repository.saveMealPlan(mealPlan);
+        return mealPlan;
+    }
+    
+    getMealPlan(id) {
+        return this.repository.getMealPlan(id);
+    }
+    
+    getUserMealPlans() {
+        if (!this.isLoggedIn()) return [];
+        return this.repository.getUserMealPlans(this.getCurrentUser().id);
+    }
+    
+    // Shopping List Generation (uses Strategy Pattern)
+    generateShoppingList(mealPlanId, strategyType = 'basic') {
+        const mealPlan = this.repository.getMealPlan(mealPlanId);
+        if (!mealPlan) throw new Error('Meal plan not found');
+        
+        // Use Strategy Pattern
+        const strategy = ShoppingListStrategyFactory.createStrategy(strategyType);
+        return strategy.generate(mealPlan, this.repository);
+    }
+    
+    // Sharing
+    shareMealPlan(mealPlanId, targetUserEmail) {
+        const mealPlan = this.repository.getMealPlan(mealPlanId);
+        if (!mealPlan) throw new Error('Meal plan not found');
+        if (mealPlan.userId !== this.getCurrentUser().id) throw new Error('Not your meal plan');
+        
+        const targetUser = this.repository.getUserByEmail(targetUserEmail);
+        if (!targetUser) throw new Error('Target user not found');
+        
+        // Create a copy for the target user
+        const sharedPlan = new MealPlan(
+            null,
+            targetUser.id,
+            ${mealPlan.name} (Shared by ${this.getCurrentUser().name}),
+            [...mealPlan.entries]
+        );
+        
+        this.repository.saveMealPlan(sharedPlan);
+        return sharedPlan;
+    }
+    
+    // Sample Data - FIXED VERSION
+    initializeSampleData() {
+        console.log('Initializing sample data...');
+        
+        // Create sample users and save them
+        const alice = this.register('Alice', 'alice@example.com');
+        const bob = this.register('Bob', 'bob@example.com');
+        
+        console.log(Created users: ${alice.name}, ${bob.name});
+        
+        // Login as Alice
+        const loggedInUser = this.login('alice@example.com');
+        if (!loggedInUser) {
+            console.log('ERROR: Failed to login after registration');
+            return;
+        }
+        console.log(Logged in as: ${loggedInUser.name});
