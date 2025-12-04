@@ -116,4 +116,29 @@ getMealPlan(id) {
 getUserMealPlans(userId) {
     return Array.from(this.mealPlans.values()).filter(plan => plan.userId === userId);
 }
+
+saveUser(user) {
+    if(!user.id) {
+        user.id = 'user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}';
+    }
+    this.users.set(user.id, user);
+    return user.id;
 }
+
+getUser(id) {
+    return this.users.get(id);
+}
+
+getUserByEmail(email) {
+    return Array.from(this.users.values()).find(user => user.email === email);
+}
+
+setCurrentUser(user) {
+    this.currentUserId = user ? user.id : null;
+}
+
+getCurrentUser() {
+    return this.currentUserId ? this.getUser(this.currentUserId) : null;
+}
+}
+
